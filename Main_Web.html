@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Light Pulse Detector</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      padding: 1rem;
+      background: #000;
+      color: #fff;
+    }
+    video {
+      width: 100%;
+      max-width: 480px;
+      border: 2px solid #fff;
+      border-radius: 12px;
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>LED Pulse Detector</h1>
+  <p>Point the front camera at the LED. It will detect 3 or 5 flashes.</p>
+  <video id="video" autoplay playsinline></video>
+
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    let pulseCount = 0;
+    let detecting = false;
+    let lastBrightness = null;
+    let lastFlashTime = 0;
+    const pulseThreshold = 50;
+    const debounceTime = 200;
+    const decisionDelay = 2000;
+    let decisionTimeout = null;
+
+    function getBrightness(frame) {
+      const length = frame.data.length;
+      let total = 0;
+      for (let i = 0; i < length; i += 4) {
+        total += (frame.data[i] + frame.data[i+1] + frame.data[i+2]) / 3;
+      }
+      return total / (length / 4);
+    }
+
+    function makeDecision() {
+      console.log(`Final pulse count: ${pulseCount}`);
+      if (pulseCount === 3) {
+        window.location.href = "https://codelectrons.github.io/Mona_Lisa/";
+      } else if (pulseCount === 5) {
+        window.location.href = "https://codelectrons.github.io/Smat_Watch/";
+      } else {
+        pulseCount = 0;
+        lastBrightness = null;
+        console.log("Resetting pulse count");
+      }
+    }
+
+    function detectPulse() {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const brightness = getBrightness(frame);
+
+      const now = Date.now();
+      if (lastBrightness !== null) {
+        const diff = brightness - lastBrightness;
+        if (diff > pulseThreshold && now - lastFlashTime > debounceTime) {
+          pulseCount++;
+          lastFlashTime = now;
+          console.log(`Pulse ${pulseCount}`);
+
+          if (decisionTimeout) clearTimeout(decisionTimeout);
+          decisionTimeout = setTimeout(makeDecision, decisionDelay);
+        }
+      }
+
+      lastBrightness = brightness;
+      if (detecting) {
+        requestAnimationFrame(detectPulse);
+      }
+    }
+
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "user" } // front camera
+    })
+    .then((stream) => {
+      video.srcObject = stream;
+      video.onloadedmetadata = () => {
+        detecting = true;
+        detectPulse();
+      };
+    })
+    .catch((err) => {
+      alert("Camera access is required.");
+      console.error(err);
+    });
+  </script>
+</body>
+</html>
